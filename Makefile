@@ -8,8 +8,8 @@ help:
 	@echo "  make stop-db      - Stop PostgreSQL"
 	@echo "  make init-db      - Initialize database with pgvector"
 	@echo "  make run          - Run the bot"
-	@echo "  make label        - Run labeling tool"
-	@echo "  make build-embeddings - Build embeddings for memes"
+	@echo "  make import-xlsx  - Import memes from Excel file"
+	@echo "  make pre-commit   - Run pre-commit checks"
 
 install:
 	uv sync
@@ -36,6 +36,9 @@ label:
 
 build-embeddings:
 	python tools/build_embedding.py
+
+import-xlsx:
+	python tools/import_xlsx.py
 
 pre-commit:
 	pre-commit run --all-files
