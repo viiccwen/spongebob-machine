@@ -1,108 +1,90 @@
-"""Meme dataset loading and management."""
+"""Meme dataset loading and management from database."""
 
-import json
-import os
 import logging
 from typing import List, Dict, Optional
-from pathlib import Path
+
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
+
+from db.connection import SessionLocal
+from db.models import Meme
 
 logger = logging.getLogger(__name__)
 
 
 class MemeDataset:
-    """Manages meme metadata and dataset operations."""
+    """Manages meme metadata and dataset operations from database."""
 
-    def __init__(self, data_dir: str = "data"):
-        """
-        Initialize meme dataset.
+    def __init__(self):
+        """Initialize meme dataset from database."""
+        self.db: Optional[Session] = None
 
-        Args:
-            data_dir: Directory containing memes.json and images/
-        """
-        self.data_dir = Path(data_dir)
-        self.memes_file = self.data_dir / "memes.json"
-        self.memes: List[Dict] = []
-        self._load_memes()
-
-    def _load_memes(self):
-        """Load memes from JSON file."""
-        if not self.memes_file.exists():
-            logger.warning(
-                f"Meme file not found: {self.memes_file}. Creating empty dataset."
-            )
-            self.memes = []
-            self._create_sample_memes_file()
-            return
-
-        try:
-            with open(self.memes_file, "r", encoding="utf-8") as f:
-                self.memes = json.load(f)
-            logger.info(f"Loaded {len(self.memes)} memes from {self.memes_file}")
-        except Exception as e:
-            logger.error(f"Error loading memes: {e}")
-            self.memes = []
-
-    def _create_sample_memes_file(self):
-        """Create a sample memes.json file if it doesn't exist."""
-        sample_memes = [
-            {
-                "id": "sb_001",
-                "file": "images/tired/sb_001.jpg",
-                "emotion": ["tired", "despair"],
-                "intent": ["complain", "burnout"],
-                "tone": ["sarcastic"],
-                "keywords": ["累", "好煩", "不想做了", "下班", "人生好難"],
-                "caption": "我真的不行了",
-            }
-        ]
-
-        os.makedirs(self.data_dir, exist_ok=True)
-        with open(self.memes_file, "w", encoding="utf-8") as f:
-            json.dump(sample_memes, f, ensure_ascii=False, indent=2)
-        logger.info(f"Created sample memes file: {self.memes_file}")
+    def _get_db(self) -> Session:
+        """Get database session."""
+        if self.db is None:
+            self.db = SessionLocal()
+        return self.db
 
     def get_all_memes(self) -> List[Dict]:
-        """Get all memes."""
-        return self.memes
+        """Get all memes from database."""
+        db = self._get_db()
+        try:
+            memes = db.execute(select(Meme)).scalars().all()
+            return [meme.to_dict() for meme in memes]
+        except Exception as e:
+            logger.error(f"Error loading memes from database: {e}")
+            return []
 
     def get_meme_by_id(self, meme_id: str) -> Optional[Dict]:
         """Get meme by ID."""
-        for meme in self.memes:
-            if meme.get("id") == meme_id:
-                return meme
-        return None
+        db = self._get_db()
+        try:
+            meme = db.execute(
+                select(Meme).where(Meme.meme_id == meme_id)
+            ).scalar_one_or_none()
+            return meme.to_dict() if meme else None
+        except Exception as e:
+            logger.error(f"Error getting meme by ID: {e}")
+            return None
 
-    def get_memes_by_emotion(self, emotion: str) -> List[Dict]:
-        """Get memes matching a specific emotion."""
-        return [meme for meme in self.memes if emotion in meme.get("emotion", [])]
-
-    def get_memes_by_intent(self, intent: str) -> List[Dict]:
-        """Get memes matching a specific intent."""
-        return [meme for meme in self.memes if intent in meme.get("intent", [])]
-
-    def get_file_path(self, meme: Dict) -> Optional[Path]:
+    def search_by_alias(self, query: str) -> Optional[Dict]:
         """
-        Get full file path for a meme.
+        Search memes by alias using pg_trgm similarity.
 
         Args:
-            meme: Meme dictionary with 'file' key
+            query: Search query text
 
         Returns:
-            Path object or None if file doesn't exist
+            Meme dictionary if found, None otherwise
         """
-        file_path = self.data_dir / meme.get("file", "")
-        if file_path.exists():
-            return file_path
-        return None
+        db = self._get_db()
+        try:
+            stmt = text(
+                """
+                SELECT m.*,
+                  MAX(similarity(a, :query)) AS score
+                FROM memes m,
+                     unnest(m.aliases) AS a
+                GROUP BY m.id, m.meme_id, m.name, m.aliases
+                HAVING MAX(similarity(a, :query)) > 0.3
+                ORDER BY score DESC
+                LIMIT 1
+                """
+            )
+            result = db.execute(stmt, {"query": query}).mappings().first()
+            return dict(result) if result else None
+        except Exception as e:
+            logger.error(f"Alias search error: {e}")
+            return None
 
 
 # Global dataset instance
 _dataset: Optional[MemeDataset] = None
 
 
-def get_dataset(data_dir: str = "data") -> MemeDataset:
+def get_dataset() -> MemeDataset:
     """Get or create global dataset instance."""
     global _dataset
     if _dataset is None:
-        _dataset = MemeDataset(data_dir)
+        _dataset = MemeDataset()
     return _dataset

@@ -4,9 +4,8 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from nlp.intent import analyze_intent_emotion
 from meme.selector import select_meme
-from bot.keyboards import get_main_keyboard
+from bot.utils import get_image_from_r2
 
 logger = logging.getLogger(__name__)
 
@@ -16,31 +15,39 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
 
     try:
-        # Analyze user input for intent and emotion
-        analysis = analyze_intent_emotion(user_text)
-        logger.info(f"User input: {user_text}, Analysis: {analysis}")
+        # Select appropriate meme using name similarity search
+        logger.info(f"User input: {user_text}")
+        meme_result = select_meme(user_text)
 
-        # Select appropriate meme
-        meme_result = select_meme(user_text, analysis)
+        print(meme_result)
 
         if meme_result:
             # Send meme image with caption
             caption = meme_result.get("response_text", "這張給你！")
-            image_path = meme_result["file_path"]
+            meme = meme_result.get("meme", {})
+            meme_id = meme.get("meme_id", "")
 
-            with open(image_path, "rb") as photo:
-                await update.message.reply_photo(
-                    photo=photo, caption=caption, reply_markup=get_main_keyboard()
-                )
+            if meme_id:
+                # Get image from R2
+                image_data = await get_image_from_r2(meme_id)
+                if image_data:
+                    image_data.seek(0)  # Reset file pointer
+                    await update.message.reply_photo(
+                        photo=image_data,
+                        caption=caption,
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to get image from R2 for meme_id: {meme_id}"
+                    )
+                    await update.message.reply_text("找不到圖片，請稍後再試！")
+            else:
+                logger.warning("No meme_id found in meme result")
+                await update.message.reply_text("找不到圖片，請稍後再試！")
         else:
             # Fallback if no meme found
-            await update.message.reply_text(
-                "找不到適合的梗圖，試試看用按鈕選擇吧！",
-                reply_markup=get_main_keyboard(),
-            )
+            await update.message.reply_text("找不到適合的梗圖，請再試試看！")
 
     except Exception as e:
         logger.error(f"Error processing message: {e}", exc_info=True)
-        await update.message.reply_text(
-            "發生錯誤，請稍後再試！", reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text("發生錯誤，請稍後再試！")
