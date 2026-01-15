@@ -6,7 +6,7 @@ import logging
 import os
 from functools import partial
 from typing import Any, Optional
-
+from telegram import Update
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
@@ -79,3 +79,51 @@ async def get_image_from_r2(meme_id: str) -> Optional[io.BytesIO]:
     except Exception as e:
         logger.error(f"Unexpected error getting image from R2: {e}")
         return None
+
+
+async def send_meme_photo(
+    update: "Update",
+    meme_result: Optional[dict],
+    not_found_message: str = "找不到適合的梗圖，請再試試看！",
+) -> bool:
+    """
+    Send meme photo from R2 to Telegram.
+
+    Args:
+        update: Telegram Update object
+        meme_result: Dictionary containing meme info and response_text, or None
+        not_found_message: Message to send if meme not found
+
+    Returns:
+        True if meme was sent successfully, False otherwise
+    """
+
+    if not meme_result:
+        await update.message.reply_text(not_found_message)
+        return False
+
+    caption = meme_result.get("response_text", "這張給你！")
+    meme = meme_result.get("meme", {})
+    # Meme dict uses "id" key (from to_dict()), not "meme_id"
+    meme_id = meme.get("id") or meme.get("meme_id", "")
+
+    if not meme_id:
+        logger.warning("No meme_id found in meme result")
+        await update.message.reply_text("找不到圖片，請稍後再試！")
+        return False
+
+    try:
+        # Get image from R2
+        image_data = await get_image_from_r2(meme_id)
+        if image_data:
+            image_data.seek(0)  # Reset file pointer
+            await update.message.reply_photo(photo=image_data, caption=caption)
+            return True
+        else:
+            logger.warning(f"Failed to get image from R2 for meme_id: {meme_id}")
+            await update.message.reply_text("找不到圖片，請稍後再試！")
+            return False
+    except Exception as e:
+        logger.error(f"Error sending meme photo: {e}", exc_info=True)
+        await update.message.reply_text("發生錯誤，請稍後再試！")
+        return False
