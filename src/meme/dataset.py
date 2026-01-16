@@ -47,15 +47,16 @@ class MemeDataset:
             logger.error(f"Error getting meme by ID: {e}")
             return None
 
-    def search_by_alias(self, query: str) -> Optional[Dict]:
+    def search_by_alias(self, query: str, limit: int = 1) -> List[Dict]:
         """
         Search memes by alias using pg_trgm similarity.
 
         Args:
             query: Search query text
+            limit: Maximum number of results to return (default: 1)
 
         Returns:
-            Meme dictionary if found, None otherwise
+            List of meme dictionaries, empty list if none found
         """
         db = self._get_db()
         try:
@@ -68,14 +69,16 @@ class MemeDataset:
                 GROUP BY m.id, m.meme_id, m.name, m.aliases
                 HAVING MAX(similarity(a, :query)) > 0.3
                 ORDER BY score DESC
-                LIMIT 1
+                LIMIT :limit
                 """
             )
-            result = db.execute(stmt, {"query": query}).mappings().first()
-            return dict(result) if result else None
+            results = (
+                db.execute(stmt, {"query": query, "limit": limit}).mappings().all()
+            )
+            return [dict(result) for result in results]
         except Exception as e:
             logger.error(f"Alias search error: {e}")
-            return None
+            return []
 
 
 # Global dataset instance

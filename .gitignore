@@ -24,9 +24,7 @@ uv.lock
 *.swo
 
 # Data
-data/images/
-data/embeddings.npy
-data/memes.json
+data/
 
 # Logs
 *.log

@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from meme.selector import select_meme
-from bot.utils import send_meme_photo
+from bot.utils import send_meme_selection
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         logger.info(f"User input: {user_text}")
-        meme_result = select_meme(user_text)
-        await send_meme_photo(
-            update, meme_result, not_found_message="找不到適合的梗圖，請再試試看！"
+        memes = select_meme(user_text, count=3)
+        await send_meme_selection(
+            update, memes, not_found_message="找不到適合的梗圖，請再試試看！"
         )
     except Exception as e:
         logger.error(f"Error processing message: {e}", exc_info=True)

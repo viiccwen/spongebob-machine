@@ -2,7 +2,7 @@
 
 import random
 import logging
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from meme.dataset import get_dataset
 
@@ -14,47 +14,47 @@ RESPONSE_TEMPLATES = {
 }
 
 
-def select_meme(user_text: str) -> Optional[Dict]:
+def select_meme(user_text: str, count: int = 3) -> Optional[List[Dict]]:
     """
-    Select the best meme for user input using alias search.
+    Select multiple memes for user input using alias search.
 
     Args:
         user_text: User input text
+        count: Number of memes to return (default: 3)
 
     Returns:
-        Dictionary with meme info and response text, or None
+        List of dictionaries with meme info, or None if no memes found
     """
     dataset = get_dataset()
 
-    # Search by alias
-    meme = dataset.search_by_alias(user_text)
+    # Search by alias, get up to count results
+    memes = dataset.search_by_alias(user_text, limit=count)
 
-    if not meme:
+    if not memes:
         logger.warning("No memes found matching query")
         return None
 
-    # Generate response text
-    response_text = random.choice(RESPONSE_TEMPLATES["default"])
-
-    return {
-        "meme": meme,
-        "response_text": response_text,
-    }
+    return memes
 
 
-def select_meme_by_random(intent: str) -> Optional[Dict]:
+def select_meme_by_random(intent: str, count: int = 3) -> Optional[List[Dict]]:
+    """
+    Select random memes.
+
+    Args:
+        intent: Intent type (not used, kept for compatibility)
+        count: Number of memes to return (default: 3)
+
+    Returns:
+        List of meme dictionaries, or None if no memes available
+    """
     dataset = get_dataset()
     all_memes = dataset.get_all_memes()
 
     if not all_memes:
         return None
 
-    # Random selection
-    meme = random.choice(all_memes)
+    # Random selection of count memes
+    selected_memes = random.sample(all_memes, min(count, len(all_memes)))
 
-    response_text = random.choice(RESPONSE_TEMPLATES["default"])
-
-    return {
-        "meme": meme,
-        "response_text": response_text,
-    }
+    return selected_memes
