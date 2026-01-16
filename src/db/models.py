@@ -23,7 +23,7 @@ class Meme(Base):  # type: ignore[misc, valid-type]
     def to_dict(self) -> dict:
         """Convert model to dictionary."""
         return {
-            "id": self.meme_id,
+            "meme_id": self.meme_id,
             "name": self.name,
             "aliases": self.aliases or [],
         }
