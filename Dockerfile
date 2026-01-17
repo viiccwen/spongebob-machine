@@ -13,21 +13,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy dependency files (including README.md which is referenced in pyproject.toml)
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml README.md ./
 
 # Install dependencies using uv
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 # Copy application code
 COPY . .
 
 # Set Python path to include src
 ENV PYTHONPATH=/app/src
-
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
-USER appuser
 
 # Run the bot
 CMD ["uv", "run", "main.py"]
