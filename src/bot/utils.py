@@ -132,6 +132,7 @@ async def send_meme_photo(
 async def send_meme_selection(
     update: "Update",
     memes: Optional[List[Dict]],
+    user_query_id: Optional[int] = None,
     not_found_message: str = "找不到適合的梗圖，請再試試看！",
 ) -> bool:
     """
@@ -140,6 +141,7 @@ async def send_meme_selection(
     Args:
         update: Telegram Update object
         memes: List of meme dictionaries, or None
+        user_query_id: Optional user query ID to associate with selection
         not_found_message: Message to send if no memes found
 
     Returns:
@@ -179,6 +181,16 @@ async def send_meme_selection(
                 # Use same response templates as selector
                 response_texts = ["這張給你！", "希望這張適合你", "找到了！"]
                 caption = random.choice(response_texts)
+                telegram_user_id = (
+                    update.effective_user.id if update.effective_user else None
+                )
+                if telegram_user_id and user_query_id:
+                    from db.user_queries import update_user_query_selection
+
+                    update_user_query_selection(
+                        telegram_user_id, meme_id, user_query_id
+                    )
+
                 await update.message.reply_photo(photo=image_data, caption=caption)
                 return True
             else:
@@ -196,8 +208,13 @@ async def send_meme_selection(
         # Create selection buttons (1, 2, 3)
         keyboard = []
         for idx, meme_id in enumerate(meme_ids, start=1):
+            # Include user_query_id in callback_data if available
+            if user_query_id:
+                callback_data = f"select_meme:{meme_id}:{user_query_id}"
+            else:
+                callback_data = f"select_meme:{meme_id}"
             keyboard.append(
-                [InlineKeyboardButton(str(idx), callback_data=f"select_meme:{meme_id}")]
+                [InlineKeyboardButton(str(idx), callback_data=callback_data)]
             )
 
         reply_markup = InlineKeyboardMarkup(keyboard)
