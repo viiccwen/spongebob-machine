@@ -1,4 +1,4 @@
-.PHONY: help install setup start-db stop-db init-db run label build-embeddings
+.PHONY: help install setup start-db stop-db init-db run import-xlsx pre-commit
 
 help:
 	@echo "Available commands:"
@@ -30,12 +30,6 @@ init-db:
 
 run:
 	python main.py
-
-label:
-	python tools/label_tool.py data/images/
-
-build-embeddings:
-	python tools/build_embedding.py
 
 import-xlsx:
 	python tools/import_xlsx.py

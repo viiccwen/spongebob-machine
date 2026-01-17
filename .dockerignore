@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# UV (keep uv.lock, exclude .uv cache)
+.uv/
+
+# Environment
+.env
+.env.local
+env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (exclude large data files)
+data/images/
+*.xlsx
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Other
+Makefile
