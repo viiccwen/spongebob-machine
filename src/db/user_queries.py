@@ -1,14 +1,83 @@
 """Database operations for user queries and selections."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import date, datetime, timezone
+import os
+from typing import Optional, Tuple
 
+from dotenv import load_dotenv
 
 from db.connection import SessionLocal
 from db.models import User, UserQuery
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+# Rate limit configuration
+DAILY_QUERY_LIMIT = int(os.getenv("DAILY_QUERY_LIMIT", 100))
+
+
+def check_and_update_rate_limit(telegram_user_id: int) -> Tuple[bool, Optional[str]]:
+    """
+    Check if user has exceeded daily query limit and update count.
+
+    Args:
+        telegram_user_id: Telegram user ID
+
+    Returns:
+        Tuple of (is_allowed, error_message)
+        - is_allowed: True if user can make query, False if limit exceeded
+        - error_message: Error message if limit exceeded, None otherwise
+    """
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_user_id == telegram_user_id).first()
+        today = date.today()
+
+        if not user:
+            # New user, create with today's date
+            user = User(
+                telegram_user_id=telegram_user_id,
+                last_query_time=datetime.now(timezone.utc),
+                daily_query_count=0,
+                last_reset_date=today,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return (True, None)
+
+        # Check if we need to reset the counter (new day)
+        if user.last_reset_date != today:
+            user.daily_query_count = 0
+            user.last_reset_date = today
+
+        # Check if limit exceeded
+        if user.daily_query_count >= DAILY_QUERY_LIMIT:
+            remaining = DAILY_QUERY_LIMIT - user.daily_query_count
+            error_msg = f"今日查詢次數已達上限（{DAILY_QUERY_LIMIT} 次），請明天再試！"
+            return (False, error_msg)
+
+        # Increment counter
+        user.daily_query_count += 1
+        user.last_query_time = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(user)
+
+        remaining = DAILY_QUERY_LIMIT - user.daily_query_count
+        logger.info(
+            f"User {telegram_user_id} query count: {user.daily_query_count}/{DAILY_QUERY_LIMIT} (remaining: {remaining})"
+        )
+
+        return (True, None)
+    except Exception as e:
+        logger.error(f"Error checking rate limit: {e}", exc_info=True)
+        db.rollback()
+        # On error, allow the query to proceed (fail open)
+        return (True, None)
+    finally:
+        db.close()
 
 
 def get_or_create_user(telegram_user_id: int) -> User:
@@ -25,9 +94,12 @@ def get_or_create_user(telegram_user_id: int) -> User:
     try:
         user = db.query(User).filter(User.telegram_user_id == telegram_user_id).first()
         if not user:
+            today = date.today()
             user = User(
                 telegram_user_id=telegram_user_id,
                 last_query_time=datetime.now(timezone.utc),
+                daily_query_count=0,
+                last_reset_date=today,
             )
             db.add(user)
             db.commit()
@@ -62,19 +134,10 @@ def create_user_query(
     """
     db = SessionLocal()
     try:
-        # Get or create user in the same session
         user = db.query(User).filter(User.telegram_user_id == telegram_user_id).first()
         if not user:
-            user = User(
-                telegram_user_id=telegram_user_id,
-                last_query_time=datetime.now(timezone.utc),
-            )
-            db.add(user)
-            db.flush()  # Flush to get user.id
-            logger.info(f"Created new user: {telegram_user_id}")
-        else:
-            # Update last query time
-            user.last_query_time = datetime.now(timezone.utc)
+            logger.error(f"User {telegram_user_id} not found when creating query")
+            return None
 
         user_query = UserQuery(
             user_id=user.id,
