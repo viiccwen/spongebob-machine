@@ -1,11 +1,26 @@
 """Database models using SQLAlchemy."""
 
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import ARRAY, Column, Integer, String
+from sqlalchemy import (
+    ARRAY,
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
+
+
+def utc_now():
+    """Get current UTC datetime with timezone awareness."""
+    return datetime.now(timezone.utc)
 
 
 class Meme(Base):  # type: ignore[misc, valid-type]
@@ -26,4 +41,69 @@ class Meme(Base):  # type: ignore[misc, valid-type]
             "meme_id": self.meme_id,
             "name": self.name,
             "aliases": self.aliases or [],
+        }
+
+
+class User(Base):  # type: ignore[misc, valid-type]
+    """User model for storing Telegram user information."""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    telegram_user_id = Column(
+        BigInteger, unique=True, nullable=False, index=True
+    )  # Telegram user ID
+    last_query_time = Column(
+        DateTime, nullable=True, default=utc_now, onupdate=utc_now
+    )  # Last query time
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+
+    # Relationship to user queries
+    queries = relationship(
+        "UserQuery", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    def to_dict(self) -> dict:
+        """Convert model to dictionary."""
+        return {
+            "id": self.id,
+            "telegram_user_id": self.telegram_user_id,
+            "last_query_time": (
+                self.last_query_time.isoformat() if self.last_query_time else None
+            ),
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class UserQuery(Base):  # type: ignore[misc, valid-type]
+    """User query model for storing user search queries and selected memes."""
+
+    __tablename__ = "user_queries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )  # Foreign key to users
+    query_text = Column(
+        String(500), nullable=True
+    )  # User input text (null for /random)
+    selected_meme_id = Column(
+        String(50), ForeignKey("memes.meme_id", ondelete="SET NULL"), nullable=True
+    )  # Selected meme ID (set when user makes selection)
+    created_at = Column(DateTime, nullable=False, default=utc_now, index=True)
+    updated_at = Column(DateTime, nullable=True, onupdate=utc_now)
+
+    # Relationships
+    user = relationship("User", back_populates="queries")
+    meme = relationship("Meme", foreign_keys=[selected_meme_id])
+
+    def to_dict(self) -> dict:
+        """Convert model to dictionary."""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "query_text": self.query_text,
+            "selected_meme_id": self.selected_meme_id,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
