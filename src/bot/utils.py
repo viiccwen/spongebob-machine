@@ -4,6 +4,7 @@ import asyncio
 import io
 import logging
 import os
+import random
 from functools import partial
 from typing import Any, Dict, List, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -169,6 +170,23 @@ async def send_meme_selection(
             await update.message.reply_text("找不到圖片，請稍後再試！")
             return False
 
+        # If only one meme, send it directly
+        if len(meme_ids) == 1:
+            meme_id = meme_ids[0]
+            image_data = await get_image_from_r2(meme_id)
+            if image_data:
+                image_data.seek(0)
+                # Use same response templates as selector
+                response_texts = ["這張給你！", "希望這張適合你", "找到了！"]
+                caption = random.choice(response_texts)
+                await update.message.reply_photo(photo=image_data, caption=caption)
+                return True
+            else:
+                logger.warning(f"Failed to get image from R2 for meme_id: {meme_id}")
+                await update.message.reply_text("找不到圖片，請稍後再試！")
+                return False
+
+        # Multiple memes: show selection interface
         # Build selection text
         selection_text = "找到以下選項：\n\n"
         for idx, meme_info in enumerate(meme_list, start=1):
