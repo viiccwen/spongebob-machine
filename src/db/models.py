@@ -1,9 +1,9 @@
 """Database models using SQLAlchemy."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import ARRAY, BigInteger, DateTime, ForeignKey, Integer, String
+from sqlalchemy import ARRAY, BigInteger, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,6 +50,12 @@ class User(Base):  # type: ignore[misc, valid-type]
     last_query_time: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=utc_now, onupdate=utc_now
     )  # Last query time
+    daily_query_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )  # Daily query count for rate limiting
+    last_reset_date: Mapped[Optional[date]] = mapped_column(
+        Date, nullable=True
+    )  # Last date when query count was reset
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
