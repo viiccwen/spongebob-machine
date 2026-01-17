@@ -48,10 +48,10 @@ class User(Base):  # type: ignore[misc, valid-type]
         BigInteger, unique=True, nullable=False, index=True
     )  # Telegram user ID
     last_query_time: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, nullable=True, default=utc_now, onupdate=utc_now
+        DateTime(timezone=True), nullable=True, default=utc_now, onupdate=utc_now
     )  # Last query time
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=utc_now
+        DateTime(timezone=True), nullable=False, default=utc_now
     )
 
     # Relationship to user queries
@@ -87,10 +87,10 @@ class UserQuery(Base):  # type: ignore[misc, valid-type]
         String(50), ForeignKey("memes.meme_id", ondelete="SET NULL"), nullable=True
     )  # Selected meme ID (set when user makes selection)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=utc_now, index=True
+        DateTime(timezone=True), nullable=False, default=utc_now, index=True
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, nullable=True, onupdate=utc_now
+        DateTime(timezone=True), nullable=True, onupdate=utc_now
     )
 
     # Relationships
