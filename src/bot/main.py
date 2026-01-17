@@ -1,6 +1,5 @@
 """Main entry point for the Telegram bot."""
 
-import logging
 import os
 from dotenv import load_dotenv
 from telegram import Update
@@ -16,31 +15,15 @@ from bot.handlers.start import start_handler
 from bot.handlers.message import message_handler
 from bot.handlers.random import random_handler
 from bot.handlers.callback import callback_handler
+from bot.logger import get_logger, setup_logging
 
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=(
-        logging.INFO if os.getenv("DEBUG", "false").lower() != "true" else logging.DEBUG
-    ),
-)
+# Setup logging (must be called before importing other modules that use logging)
+setup_logging()
 
-# Suppress logs from external packages
-logging.getLogger("asyncio").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("telegram").setLevel(logging.WARNING)
-logging.getLogger("telegram.ext").setLevel(logging.WARNING)
-logging.getLogger("telegram.bot").setLevel(logging.WARNING)
-logging.getLogger("telegram.client").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("boto3").setLevel(logging.WARNING)
-logging.getLogger("botocore").setLevel(logging.WARNING)
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def main():
